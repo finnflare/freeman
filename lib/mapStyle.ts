@@ -1,4 +1,4 @@
-export function getSatelliteStyle(): string | object {
+export function getSatelliteStyle(): string | any {
   const key = process.env.NEXT_PUBLIC_MAPTILER_KEY;
   if (key) {
     // Crisp satellite with labels (free MapTiler key)
@@ -29,7 +29,7 @@ export function getSatelliteStyle(): string | object {
         maxzoom: 22
       }
     ]
-  };
+  } as any;
 }
 
 export function fallbackMaxZoom(): number {

@@ -163,7 +163,7 @@ export default function MapView({
             type: "line",
             source: sourceId,
             layout: {
-              visibility: highlightedRoutes.includes(r.id) ? "visible" : "none",
+              visibility: "none",
             },
             paint: {
               "line-width": 3,
