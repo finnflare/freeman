@@ -1,11 +1,9 @@
-# backend:
-  # name: test-repo
-
-# Uncomment below when you have a GitHub repo and want to use it in production:
 backend:
-   name: github
-   repo: finnflare/freeman
-   branch: main
+  name: git-gateway
+  branch: main
+
+# Local backend for development (comment out for production)
+# local_backend: true
 
 media_folder: "public/media"
 public_folder: "/media"
