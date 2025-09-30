@@ -1,0 +1,12 @@
+{
+  "type": "Feature",
+  "properties": { "id": "kyoto-evening-walk", "title": "Kyoto Evening Walk" },
+  "geometry": {
+    "type": "LineString",
+    "coordinates": [
+      [135.7714, 35.0032],
+      [135.7743, 35.0029],
+      [135.7761, 35.0038]
+    ]
+  }
+}

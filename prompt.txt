@@ -1,0 +1,294 @@
+You are scaffolding a production-ready, free-tier personal travel map web app. Deliver a complete Next.js 14 (App Router) + TypeScript project that runs locally with `npm run dev` and deploys to Netlify with no database and no API keys. Data is file-based (MDX + GeoJSON). Use only popular, well-documented libraries. Do not invent fields or files. Do not add authentication, server APIs, or databases. Keep everything deterministic and typed.
+
+=====================================
+PROJECT GOAL
+=====================================
+A map where the user clicks pins to open a right-side drawer showing photos, a rich text description, optional audio, and optional route overlays. All content is stored as files editable via a free Git-based CMS (Decap). No backend, no DB.
+
+=====================================
+STACK (MANDATORY)
+=====================================
+- Framework: Next.js 14 (App Router) + TypeScript
+- UI: Tailwind CSS + shadcn/ui
+- Map: maplibre-gl@^3 using free OpenStreetMap tiles (https://demotiles.maplibre.org/style.json)
+- Content: MDX files with frontmatter for “places”; GeoJSON for “routes”
+- CMS (Admin): Decap CMS via `/admin` that commits directly to GitHub (free)
+- Images/Audio: stored in `/public/media` (no external storage, no keys)
+- Build-time content loading: `gray-matter`, `remark`, `rehype` (server-only)
+- No database, no API keys, no server actions that require secrets
+
+=====================================
+FILE & FOLDER STRUCTURE (EXACT)
+=====================================
+Create exactly these paths and populate them with working code/content:
+
+/app
+  /(site)/page.tsx                 # main map page (server component)
+  /places/[slug]/page.tsx          # deep-link detail route (server component)
+/app/admin/index.html              # Decap bootstrap (script tag only)
+
+/components
+  Map.tsx                          # MapLibre map, clustering, click -> select
+  PlaceDrawer.tsx                  # shadcn Sheet (right drawer) for place details
+
+/lib
+  content.ts                       # load & type “Place” (MDX -> sanitized HTML) and “Route” (GeoJSON)
+  mapStyle.ts                      # exports style URL string
+
+/content
+  /places/kyoto-gion.mdx           # sample place #1
+  /places/tokyo-akihabara.mdx      # sample place #2
+  /routes/kyoto-evening-walk.geojson   # sample route
+
+/public
+  /media/places/kyoto-gion/cover.jpg
+  /media/places/kyoto-gion/1.jpg
+  /media/places/akihabara/cover.jpg
+  /media/places/akihabara/1.jpg
+  /media/sfx/ic-tap.mp3
+
+decap.config.yml
+tailwind.config.ts
+postcss.config.js
+tsconfig.json
+.eslintrc.json (simple, optional but if added must not break build)
+package.json
+README.md (brief run/deploy instructions)
+
+=====================================
+DATA SCHEMAS (STRICT — DO NOT ADD FIELDS)
+=====================================
+Place frontmatter (in each MDX under /content/places):
+- id: string
+- title: string
+- date: string              # ISO, used for sorting
+- coords: [number, number]  # [lon, lat]
+- city?: string
+- country?: string
+- tags?: string[]
+- cover?: string
+- photos?: { src: string; caption?: string }[]
+- audio?: string
+- routeRefs?: string[]      # ids referencing routes to highlight
+Body of MDX = rich description (markdown, allow basic HTML).
+
+Route (GeoJSON, under /content/routes):
+GeoJSON Feature with:
+- "type": "Feature"
+- "properties": { "id": string, "title": string }
+- "geometry": { "type": "LineString", "coordinates": [ [lon,lat], ... ] }
+
+=====================================
+LIB IMPLEMENTATION REQUIREMENTS
+=====================================
+/lib/content.ts
+- export types:
+  - export type Place = { id: string; title: string; date: string; coords: [number,number]; city?: string; country?: string; tags?: string[]; cover?: string; photos?: {src: string; caption?: string}[]; audio?: string; routeRefs?: string[]; slug: string }
+  - export type PlaceWithHtml = Place & { bodyHtml: string }
+  - export type Route = { id: string; title: string; geometry: { type: "LineString"; coordinates: [number, number][] } }
+- export async function getAllPlaces(): Promise<PlaceWithHtml[]>
+  - Read all `/content/places/*.mdx`
+  - Use `gray-matter` to parse frontmatter and body
+  - Convert MDX/markdown body to sanitized HTML using remark/rehype (no remote images, no scripts, sanitize HTML)
+  - Derive `slug` from filename
+  - Validate required fields and types; throw helpful error if missing
+  - Sort by `date` descending
+- export async function getAllRoutes(): Promise<Route[]>
+  - Read all `/content/routes/*.geojson`
+  - Validate minimal schema (id, title, LineString coords)
+  - Return array (order not critical)
+
+/lib/mapStyle.ts
+- export const MAP_STYLE_URL = "https://demotiles.maplibre.org/style.json";
+
+=====================================
+COMPONENT REQUIREMENTS
+=====================================
+/components/Map.tsx
+- "use client"
+- Props: { places: Array<{ id: string; title: string; coords: [number,number] }>; onSelect: (id: string) => void; routes?: Route[] }
+- Initialize maplibre-gl with MAP_STYLE_URL, center near Japan, zoom ~5
+- Add a geojson source for places with clustering enabled (clusterRadius ~50)
+- Layers:
+  - clusters: circle + text count
+  - unclustered points: circle markers
+- map.on("click", "unclustered", get feature `id`, call onSelect(id)
+- Add NavigationControl
+- If `routes` provided: add a line layer (stroke width ~3) for each route, hidden by default; expose a helper to toggle a route by id (the caller may manage which to show)
+
+/components/PlaceDrawer.tsx
+- "use client"
+- Use shadcn Sheet (right side). Props:
+  { open: boolean; onOpenChange: (b:boolean)=>void; place: PlaceWithHtml | null }
+- Render:
+  - Title
+  - Optional cover image (Next <Image>)
+  - Tag chips if present
+  - Body HTML with `dangerouslySetInnerHTML` (already sanitized server-side)
+  - Optional photo gallery (simple stacked images with captions)
+  - Optional <audio controls src={place.audio} />
+- Keep styling minimal and responsive
+
+=====================================
+APP ROUTES REQUIREMENTS
+=====================================
+/app/(site)/page.tsx (Server Component)
+- Load places + routes via getAllPlaces/getAllRoutes
+- Maintain client state for selected place id (wrap Map + Drawer in a client boundary if needed)
+- Clicking a marker opens the Drawer with that place’s data
+- (Optional) If the selected place has `routeRefs`, highlight those routes on the map (simple effect)
+
+/app/places/[slug]/page.tsx (Server Component)
+- Find the place by slug; if not found, notFound()
+- Render a minimal page that shows the same PlaceDrawer content (open by default); ok to reuse components server/client as appropriate
+- Include basic metadata (title from place)
+
+/app/admin/index.html
+- Bootstrap Decap CMS:
+  - a minimal HTML doc with:
+    <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
+
+/decap.config.yml
+- backend:
+    name: github
+    repo: YOURUSER/YOURREPO
+    branch: main
+- media_folder: "public/media"
+- public_folder: "/media"
+- collections:
+  - places (folder: content/places, extension: mdx, format: frontmatter)
+    fields:
+      - { name: "title", label: "Title", widget: "string" }
+      - { name: "date", label: "Date", widget: "datetime" }
+      - { name: "coords", label: "Coordinates [lon,lat]", widget: "list", field: { name: "num", widget: "number" }, min: 2, max: 2 }
+      - { name: "city", label: "City", widget: "string", required: false }
+      - { name: "country", label: "Country", widget: "string", required: false }
+      - { name: "tags", label: "Tags", widget: "list", required: false }
+      - { name: "cover", label: "Cover image", widget: "image", required: false }
+      - name: "photos"
+        label: "Photos"
+        widget: "list"
+        required: false
+        fields:
+          - { name: "src", label: "Image", widget: "image" }
+          - { name: "caption", label: "Caption", widget: "string", required: false }
+      - { name: "audio", label: "Audio", widget: "file", required: false, media_library: { allow_types: ["audio/mpeg","audio/mp3","audio/wav"] } }
+      - { name: "routeRefs", label: "Route IDs", widget: "list", required: false }
+      - { name: "body", label: "Description", widget: "markdown" }
+  - routes (folder: content/routes, extension: geojson, format: json)
+    fields:
+      - { name: "raw", label: "GeoJSON", widget: "code", default_language: "json" }
+
+=====================================
+SAMPLE CONTENT (CREATE EXACTLY)
+=====================================
+/content/places/kyoto-gion.mdx
+---
+id: kyoto-gion
+title: "Gion at Dusk"
+date: "2024-06-12"
+coords: [135.773, 35.003]
+city: "Kyoto"
+country: "Japan"
+tags: ["shrine", "festival", "historic"]
+cover: "/media/places/kyoto-gion/cover.jpg"
+photos:
+  - src: "/media/places/kyoto-gion/1.jpg"
+    caption: "Lanterns on Hanamikoji"
+audio: "/media/sfx/ic-tap.mp3"
+routeRefs: ["kyoto-evening-walk"]
+---
+I wandered Gion around sunset and learned about the district’s teahouse culture...
+
+/content/places/tokyo-akihabara.mdx
+---
+id: tokyo-akihabara
+title: "Akihabara Electronics Hunt"
+date: "2024-06-18"
+coords: [139.773, 35.698]
+city: "Tokyo"
+country: "Japan"
+tags: ["electronics", "gaming"]
+cover: "/media/places/akihabara/cover.jpg"
+photos:
+  - src: "/media/places/akihabara/1.jpg"
+    caption: "Side-street retro shop"
+---
+Spent the afternoon exploring retro game stores and tiny parts shops off the main strip...
+
+/content/routes/kyoto-evening-walk.geojson
+{
+  "type": "Feature",
+  "properties": { "id": "kyoto-evening-walk", "title": "Kyoto Evening Walk" },
+  "geometry": {
+    "type": "LineString",
+    "coordinates": [
+      [135.7714, 35.0032],
+      [135.7743, 35.0029],
+      [135.7761, 35.0038]
+    ]
+  }
+}
+
+=====================================
+PACKAGE.JSON (MINIMUM DEPS)
+=====================================
+- next, react, react-dom
+- typescript, @types/node, @types/react
+- tailwindcss, postcss, autoprefixer
+- maplibre-gl
+- gray-matter
+- remark, remark-parse, remark-gfm
+- rehype, rehype-parse, rehype-stringify, rehype-sanitize
+- sharp (for Next image; if needed)
+- class-variance-authority, tailwind-merge (shadcn deps)
+- lucide-react (icons)
+- zod (optional lightweight validation; if added, use only for runtime checks)
+
+=====================================
+TAILWIND & SHADCN SETUP
+=====================================
+- Configure Tailwind (content paths: ./app/**/*, ./components/**/*, ./content/**/*)
+- Initialize shadcn/ui and include Sheet component; ensure global CSS imports work in /app/globals.css
+- Provide a minimal header bar (e.g., app title) and full-height map (use h-[calc(100dvh-48px)] or similar)
+
+=====================================
+ACCEPTANCE CRITERIA (MUST PASS)
+=====================================
+1) `npm run dev` starts the app without errors.
+2) Visiting `/` shows a full-screen MapLibre map centered roughly on Japan with two clustered/unclustered markers.
+3) Clicking a marker opens a right-side drawer with the correct place: title, cover image, tags, HTML body, photo(s), and audio control if provided.
+4) Visiting `/places/kyoto-gion` or `/places/tokyo-akihabara` renders the same content server-side (drawer content visible).
+5) `/admin` loads the Decap CMS UI (it may need Netlify + GitHub to save, but the page must render).
+6) No API keys; map tiles load from `demotiles.maplibre.org` style URL.
+7) No database usage; all data is from `/content` and `/public/media`.
+8) TypeScript passes; basic ESLint (if included) has 0 errors.
+
+=====================================
+NON-GOALS (DO NOT IMPLEMENT NOW)
+=====================================
+- Auth, forms, uploads to external storage
+- Custom tile servers or paid map providers
+- DBs (SQLite/Postgres) or Prisma
+- Server Actions that require secrets
+- Search, filters, animations (can be added later)
+
+=====================================
+README CONTENT (BRIEF)
+=====================================
+- How to run locally
+- How to add a new place: create a new MDX in /content/places, add images under /public/media, commit
+- How to add a new route: add a GeoJSON under /content/routes
+- Netlify deploy notes and Decap CMS GitHub backend placeholders
+
+=====================================
+STYLE & DX GUARDRAILS
+=====================================
+- Keep code small, readable, and idiomatic Next.js 14 App Router
+- Avoid over-engineering; no state managers beyond React state
+- Sanitize HTML body before rendering in Drawer (already done server-side)
+- Image paths use Next/Image with sensible sizes
+- Strictly follow the schemas and file structure above
+- Do not add extra files, fields, services, or abstractions
+
+Now, generate the entire project with all files populated (no TODOs), ready to run with `npm i && npm run dev`.

@@ -1,0 +1,80 @@
+backend:
+  name: github
+  repo: YOURUSER/YOURREPO
+  branch: main
+
+media_folder: "public/media"
+public_folder: "/media"
+
+collections:
+  - name: "places"
+    label: "Places"
+    folder: "content/places"
+    create: true
+    extension: "mdx"
+    format: "frontmatter"
+    fields:
+      - { name: "id", label: "ID", widget: "string" }
+      - { name: "title", label: "Title", widget: "string" }
+      - { name: "date", label: "Date", widget: "datetime" }
+      - name: "coords"
+        label: "Coordinates [lon, lat]"
+        widget: "list"
+        field: { name: "num", widget: "number" }
+        min: 2
+        max: 2
+      - { name: "city", label: "City", widget: "string", required: false }
+      - { name: "country", label: "Country", widget: "string", required: false }
+      - name: "tags"
+        label: "Tags"
+        widget: "list"
+        required: false
+      - { name: "cover", label: "Cover Image", widget: "image", required: false }
+      - name: "photos"
+        label: "Photos"
+        widget: "list"
+        required: false
+        fields:
+          - { name: "src", label: "Image", widget: "image" }
+          - { name: "caption", label: "Caption", widget: "string", required: false }
+      - name: "audio"
+        label: "Audio"
+        widget: "file"
+        required: false
+        media_library:
+          config:
+            allow_multiple: false
+      - name: "routeRefs"
+        label: "Route IDs"
+        widget: "list"
+        required: false
+      - { name: "body", label: "Description", widget: "markdown" }
+
+  - name: "routes"
+    label: "Routes"
+    folder: "content/routes"
+    create: true
+    extension: "geojson"
+    format: "json"
+    fields:
+      - { name: "type", label: "Type", widget: "hidden", default: "Feature" }
+      - name: "properties"
+        label: "Properties"
+        widget: "object"
+        fields:
+          - { name: "id", label: "ID", widget: "string" }
+          - { name: "title", label: "Title", widget: "string" }
+      - name: "geometry"
+        label: "Geometry"
+        widget: "object"
+        fields:
+          - { name: "type", label: "Type", widget: "hidden", default: "LineString" }
+          - name: "coordinates"
+            label: "Coordinates [[lon,lat],...]"
+            widget: "list"
+            field:
+              name: "coord"
+              widget: "list"
+              field: { name: "num", widget: "number" }
+              min: 2
+              max: 2
